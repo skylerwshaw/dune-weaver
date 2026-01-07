@@ -108,32 +108,25 @@ The project exposes RESTful APIs for various actions. Here are some key endpoint
    cd dune-weaver
    ```
 
-2. **Install dependencies**:
-
-   **On Raspberry Pi (full hardware support):**
+2. **Set up and run**:
    ```bash
-   pip install -r requirements.txt
-   npm install
+   make setup    # Installs Python, Node.js, and all dependencies using existing version managers if available (mise, asdf, nvm)
+   make run      # Start the development server
    ```
 
-   **On Windows/Linux/macOS (development/testing):**
-   ```bash
-   pip install -r requirements-nonrpi.txt
-   npm install
-   ```
-   > **Note**: The development installation excludes Raspberry Pi GPIO libraries. The application will run fully but DW LED features will be disabled. WLED integration will still work.
+3. **Open your browser** and navigate to `http://localhost:8080`
 
-3. **Build CSS**:
-   ```bash
-   npm run build-css
-   ```
+### Other Useful Commands
 
-4. **Start the application**:
-   ```bash
-   python main.py
-   ```
+| Command | Description |
+|---------|-------------|
+| `make setup` | Full setup (Python, Node.js, dependencies, pre-commit hooks) |
+| `make run` | Start the development server |
+| `make build-css` | Rebuild Tailwind CSS for production |
+| `make watch-css` | Watch mode for CSS development |
+| `make export-requirements` | Regenerate `requirements.txt` from `pyproject.toml` |
 
-5. **Open your browser** and navigate to `http://localhost:8080`
+> **Note**: `make setup` auto-detects your version manager (mise, asdf, pyenv, nvm, fnm) and installs the correct Python and Node.js versions. Development excludes Raspberry Pi GPIO libraries; DW LED features will be disabled but WLED integration still works.
 
 ## 📁 Project Structure
 
@@ -147,7 +140,8 @@ dune-weaver/
 │   │   ├── cache_manager.py    # Pattern preview caching
 │   │   ├── pattern_manager.py  # Pattern file handling
 │   │   ├── playlist_manager.py # Playlist system
-│   │   ├── state.py           # Global state management
+│   │   ├── process_pool.py     # Shared process pool for CPU-intensive tasks
+│   │   ├── state.py            # Global state management
 │   │   └── version_manager.py  # GitHub version checking
 │   ├── led/                    # WLED integration
 │   ├── mqtt/                   # MQTT support

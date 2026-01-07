@@ -4,13 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-### CSS/Frontend Development
-- `npm run dev` or `npm run watch-css` - Watch mode for Tailwind CSS development 
-- `npm run build-css` - Build and minify Tailwind CSS for production
+### Quick Start
+- `make setup` - Full environment setup (Python, Node.js, dependencies, pre-commit hooks)
+- `make run` - Start the FastAPI server on port 8080
 
-### Python Application
-- `python main.py` - Start the FastAPI server on port 8080
-- The application uses uvicorn internally and runs on 0.0.0.0:8080
+### Other Commands
+- `make build-css` - Build and minify Tailwind CSS for production
+- `make watch-css` - Watch mode for CSS development
+- `make export-requirements` - Regenerate `requirements.txt` from `pyproject.toml`
+
+The Makefile auto-detects version managers (mise, asdf, pyenv, nvm, fnm) for Python and Node.js installation.
 
 ## Architecture Overview
 
@@ -75,14 +78,26 @@ The project follows FastAPI best practices from `.cursorrules`:
 - Pattern execution runs in background tasks
 - Thread-safe connection management with locks
 - WebSocket connections for real-time status updates
+- **Process Pool** (`modules/core/process_pool.py`): CPU-intensive tasks (preview generation, file parsing) run in separate processes via `ProcessPoolExecutor` to avoid GIL contention with the motion control thread
+- Motion thread runs on CPU 0; worker processes pinned to CPUs 1-N for isolation
 
 ## Testing and Development
 
 ### Running the Application
-1. Install Python dependencies: `pip install -r requirements.txt`
-2. Install Node dependencies: `npm install`
-3. Build CSS: `npm run build-css`
-4. Start server: `python main.py`
+```bash
+make setup    # One-time setup (installs Python, Node.js, dependencies)
+make run      # Start the server
+```
+
+Or manually:
+1. `uv sync` (or `uv sync --extra rpi` on Raspberry Pi)
+2. `npm install`
+3. `python main.py`
+
+### Dependency Management
+- `pyproject.toml` is the source of truth for dependencies
+- `requirements.txt` is auto-generated: `uv export --extra rpi --no-hashes -o requirements.txt`
+- RPi-specific packages (GPIO, NeoPixel) are in `[project.optional-dependencies] rpi`
 
 ### File Structure Conventions
 - Pattern files in `patterns/` (can have subdirectories)
