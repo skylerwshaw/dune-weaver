@@ -455,25 +455,37 @@ class MotionControlThread:
         state.machine_y = new_y_abs
 
     def _send_grbl_coordinates_sync(self, x: float, y: float, speed: int = 600, timeout: int = 2, home: bool = False):
-        """Synchronous version of send_grbl_coordinates for motion thread."""
+        """Synchronous version of send_grbl_coordinates for motion thread.
+        
+        Optimized for streaming: uses non-blocking checks and minimal delays.
+        """
         logger.debug(f"Motion thread sending G-code: X{x} Y{y} at F{speed}")
 
-        # Track overall attempt time
-        overall_start_time = time.time()
-
-        while True:
+        max_retries = 50  # ~5 seconds max with 0.1s sleep
+        
+        for attempt in range(max_retries):
             try:
                 gcode = f"$J=G91 G21 Y{y} F{speed}" if home else f"G1 X{x} Y{y} F{speed}"
                 state.conn.send(gcode + "\n")
                 logger.debug(f"Motion thread sent command: {gcode}")
 
+                # Wait for "ok" with tight polling loop
                 start_time = time.time()
-                while True:
-                    response = state.conn.readline()
-                    logger.debug(f"Motion thread response: {response}")
-                    if response.lower() == "ok":
-                        logger.debug("Motion thread: Command execution confirmed.")
-                        return
+                while time.time() - start_time < timeout:
+                    # Check if data available before blocking read
+                    if state.conn.in_waiting() > 0:
+                        response = state.conn.readline()
+                        logger.debug(f"Motion thread response: {response}")
+                        if response.lower() == "ok":
+                            logger.debug("Motion thread: Command execution confirmed.")
+                            return True
+                        # Got a response but not "ok" - keep reading
+                    else:
+                        # No data yet - brief sleep to avoid CPU spin
+                        time.sleep(0.005)  # 5ms poll interval
+                
+                # Timeout waiting for "ok" - will retry
+                logger.warning(f"Motion thread: Timeout waiting for 'ok' (attempt {attempt + 1})")
 
             except Exception as e:
                 error_str = str(e)
@@ -488,8 +500,10 @@ class MotionControlThread:
                     logger.info("Connection marked as disconnected due to device error")
                     return False
 
-            logger.warning(f"Motion thread: No 'ok' received for X{x} Y{y}, speed {speed}. Retrying...")
             time.sleep(0.1)
+        
+        logger.error(f"Motion thread: Failed to send X{x} Y{y} after {max_retries} attempts")
+        return False
 
 # Global motion control thread instance
 motion_controller = MotionControlThread()

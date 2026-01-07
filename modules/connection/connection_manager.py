@@ -71,13 +71,23 @@ class SerialConnection(BaseConnection):
         self.lock = threading.RLock()
         logger.info(f'Connecting to Serial port {port}')
         self.ser = serial.Serial(port, baudrate, timeout=timeout)
+        
+        # Increase serial buffers for smoother streaming (default is ~4KB)
+        try:
+            self.ser.set_buffer_size(rx_size=16384, tx_size=16384)
+            logger.debug("Serial buffers increased to 16KB")
+        except Exception as e:
+            logger.debug(f"Could not increase serial buffers: {e}")
+        
         state.port = port
         logger.info(f'Connected to Serial port {port}')
 
     def send(self, data: str) -> None:
+        """Send data without blocking flush for better streaming performance."""
         with self.lock:
             self.ser.write(data.encode())
-            self.ser.flush()
+            # Note: Removed flush() - let OS/hardware buffer handle timing
+            # This reduces latency for motion streaming
 
     def flush(self) -> None:
         with self.lock:
