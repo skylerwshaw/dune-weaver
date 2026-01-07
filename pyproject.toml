@@ -1,0 +1,38 @@
+[project]
+name = "dune-weaver"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aiofiles>=23.1.0",
+    "aiohttp>=3.13.3",
+    "fastapi>=0.100.0",
+    "jinja2>=3.1.2",
+    "paho-mqtt>=1.6.1",
+    "pillow>=12.1.0",
+    "pydantic>=2.0.0",
+    "pyserial>=3.5",
+    "python-dotenv>=1.0.0",
+    "python-multipart>=0.0.6",
+    "requests>=2.31.0",
+    "tqdm>=4.65.0",
+    "uvicorn>=0.23.0",
+    "websocket-client>=1.6.1",
+    "websockets>=11.0.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit>=3.0.0",
+]
+rpi = [
+    # GPIO/NeoPixel support for DW LEDs
+    # Note: rpi-lgpio is a drop-in replacement for RPi.GPIO that works on Pi 5
+    "lgpio>=0.2.2.0",
+    "rpi-lgpio>=0.4",
+    "rpi-ws281x>=5.0.0",
+    "adafruit-circuitpython-neopixel>=6.3.0",
+    "Adafruit-Blinka>=8.0.0",
+    "Adafruit-Blinka-Raspberry-Pi5-Neopixel>=1.0.0rc1",
+]
