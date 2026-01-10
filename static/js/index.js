@@ -1125,6 +1125,14 @@ function setupPreviewPanelEvents(pattern) {
         }
     };
 
+    // Handle add to playlist button click
+    const addToPlaylistBtn = document.getElementById('addToPlaylistBtn');
+    if (addToPlaylistBtn) {
+        addToPlaylistBtn.onclick = () => {
+            openAddToPlaylistModal(pattern);
+        };
+    }
+
     // Handle delete button click
     deleteButton.onclick = async () => {
         if (!pattern.startsWith('custom_patterns/')) {
@@ -1560,6 +1568,47 @@ document.addEventListener('DOMContentLoaded', async () => {
                         modal.classList.remove('hidden');
                         modal.dataset.manuallyTriggered = 'true';
                     }
+                }
+            });
+        }
+
+        // Setup Add to Playlist modal event listeners
+        const closeAddToPlaylistModalBtn = document.getElementById('closeAddToPlaylistModal');
+        const createNewPlaylistBtn = document.getElementById('createNewPlaylistBtn');
+        const confirmCreatePlaylistBtn = document.getElementById('confirmCreatePlaylistBtn');
+        const cancelCreatePlaylistBtn = document.getElementById('cancelCreatePlaylistBtn');
+        const newPlaylistNameInput = document.getElementById('newPlaylistNameInput');
+        const addToPlaylistModal = document.getElementById('addToPlaylistModal');
+        
+        if (closeAddToPlaylistModalBtn) {
+            closeAddToPlaylistModalBtn.addEventListener('click', closeAddToPlaylistModal);
+        }
+        
+        if (createNewPlaylistBtn) {
+            createNewPlaylistBtn.addEventListener('click', showCreatePlaylistForm);
+        }
+        
+        if (confirmCreatePlaylistBtn) {
+            confirmCreatePlaylistBtn.addEventListener('click', createPlaylistAndAddPattern);
+        }
+        
+        if (cancelCreatePlaylistBtn) {
+            cancelCreatePlaylistBtn.addEventListener('click', hideCreatePlaylistForm);
+        }
+        
+        if (newPlaylistNameInput) {
+            newPlaylistNameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    createPlaylistAndAddPattern();
+                }
+            });
+        }
+        
+        // Close modal when clicking outside
+        if (addToPlaylistModal) {
+            addToPlaylistModal.addEventListener('click', (e) => {
+                if (e.target.id === 'addToPlaylistModal') {
+                    closeAddToPlaylistModal();
                 }
             });
         }
@@ -2448,4 +2497,251 @@ function updateAllHeartIcons() {
             heartIcon.parentElement.className = heartIcon.parentElement.className.replace('opacity-0 group-hover:opacity-100', 'opacity-100');
         }
     });
+}
+
+// ==================== Add to Playlist Feature ====================
+
+// State management for add to playlist feature
+let currentPatternForPlaylist = null;
+let playlistsCache = [];
+let playlistContainsPattern = new Map(); // Map of playlistName -> boolean
+
+// Open add to playlist modal
+async function openAddToPlaylistModal(pattern) {
+    if (!pattern) {
+        logMessage('No pattern specified for adding to playlist', LOG_TYPE.ERROR);
+        return;
+    }
+    
+    currentPatternForPlaylist = pattern;
+    playlistContainsPattern.clear();
+    
+    // Show modal
+    const modal = document.getElementById('addToPlaylistModal');
+    const modalTitle = document.getElementById('addToPlaylistModalTitle');
+    const patternName = pattern.replace('.thr', '').split('/').pop();
+    
+    modalTitle.textContent = `Add "${patternName}" to Playlist`;
+    modal.classList.remove('hidden');
+    
+    // Hide create form if it's visible
+    document.getElementById('createPlaylistForm').classList.add('hidden');
+    document.getElementById('createNewPlaylistBtn').classList.remove('hidden');
+    
+    // Load playlists
+    await loadPlaylistsForPattern(pattern);
+}
+
+// Close add to playlist modal
+function closeAddToPlaylistModal() {
+    const modal = document.getElementById('addToPlaylistModal');
+    modal.classList.add('hidden');
+    
+    // Clear state
+    currentPatternForPlaylist = null;
+    playlistContainsPattern.clear();
+    
+    // Hide create form
+    document.getElementById('createPlaylistForm').classList.add('hidden');
+    document.getElementById('createNewPlaylistBtn').classList.remove('hidden');
+    document.getElementById('newPlaylistNameInput').value = '';
+}
+
+// Load playlists and check which ones contain the pattern
+async function loadPlaylistsForPattern(pattern) {
+    const playlistsGrid = document.getElementById('playlistsGrid');
+    const noPlaylistsMessage = document.getElementById('noPlaylistsMessage');
+    const playlistsLoading = document.getElementById('playlistsLoading');
+    
+    // Show loading state
+    playlistsLoading.classList.remove('hidden');
+    playlistsGrid.classList.add('hidden');
+    noPlaylistsMessage.classList.add('hidden');
+    
+    try {
+        // Fetch all playlists
+        const response = await fetch('/list_all_playlists');
+        if (!response.ok) {
+            throw new Error('Failed to fetch playlists');
+        }
+        
+        playlistsCache = await response.json();
+        
+        // Hide loading
+        playlistsLoading.classList.add('hidden');
+        
+        if (playlistsCache.length === 0) {
+            noPlaylistsMessage.classList.remove('hidden');
+            return;
+        }
+        
+        // Check which playlists contain this pattern
+        await checkPlaylistsForPattern(pattern);
+        
+        // Display playlists
+        displayPlaylistsInModal();
+        
+    } catch (error) {
+        logMessage(`Error loading playlists: ${error.message}`, LOG_TYPE.ERROR);
+        showStatusMessage('Failed to load playlists', 'error');
+        playlistsLoading.classList.add('hidden');
+    }
+}
+
+// Check which playlists contain the pattern
+async function checkPlaylistsForPattern(pattern) {
+    // Check each playlist in parallel
+    const checkPromises = playlistsCache.map(async (playlistName) => {
+        try {
+            const response = await fetch(`/get_playlist?name=${encodeURIComponent(playlistName)}`);
+            if (response.ok) {
+                const data = await response.json();
+                const contains = data.files && data.files.includes(pattern);
+                playlistContainsPattern.set(playlistName, contains);
+            }
+        } catch (error) {
+            logMessage(`Error checking playlist ${playlistName}: ${error.message}`, LOG_TYPE.WARNING);
+        }
+    });
+    
+    await Promise.all(checkPromises);
+}
+
+// Display playlists in modal
+function displayPlaylistsInModal() {
+    const playlistsGrid = document.getElementById('playlistsGrid');
+    playlistsGrid.innerHTML = '';
+    playlistsGrid.classList.remove('hidden');
+    
+    playlistsCache.forEach(playlistName => {
+        const contains = playlistContainsPattern.get(playlistName) || false;
+        const card = createPlaylistCard(playlistName, contains);
+        playlistsGrid.appendChild(card);
+    });
+}
+
+// Create a playlist card for the modal
+function createPlaylistCard(playlistName, contains) {
+    const card = document.createElement('div');
+    card.className = `group relative flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-[#0b80ee] dark:hover:border-[#0b80ee] cursor-pointer transition-all ${contains ? 'border-green-500 dark:border-green-500' : ''}`;
+    card.dataset.playlistName = playlistName;
+    
+    card.innerHTML = `
+        <span class="material-icons text-2xl text-gray-500 dark:text-gray-400 ${contains ? 'text-green-500 dark:text-green-500' : ''}">queue_music</span>
+        <span class="flex-1 text-sm font-medium text-gray-900 dark:text-gray-100 truncate">${playlistName}</span>
+        ${contains ? '<span class="material-icons text-xl text-green-500 dark:text-green-400">check_circle</span>' : '<span class="material-icons text-xl text-gray-300 dark:text-gray-600 group-hover:text-[#0b80ee] dark:group-hover:text-[#0b80ee]">add_circle</span>'}
+    `;
+    
+    // Add click handler
+    card.addEventListener('click', async () => {
+        if (!contains) {
+            await addPatternToPlaylist(currentPatternForPlaylist, playlistName);
+        }
+    });
+    
+    return card;
+}
+
+// Add pattern to an existing playlist
+async function addPatternToPlaylist(pattern, playlistName) {
+    if (!pattern || !playlistName) return;
+    
+    try {
+        const response = await fetch('/add_to_playlist', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                playlist_name: playlistName,
+                pattern: pattern
+            })
+        });
+        
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.detail || 'Failed to add pattern to playlist');
+        }
+        
+        // Update state
+        playlistContainsPattern.set(playlistName, true);
+        
+        // Show success message
+        const patternName = pattern.replace('.thr', '').split('/').pop();
+        showStatusMessage(`Added "${patternName}" to "${playlistName}"`, 'success');
+        
+        // Update the display to show checkmark
+        displayPlaylistsInModal();
+        
+    } catch (error) {
+        logMessage(`Error adding pattern to playlist: ${error.message}`, LOG_TYPE.ERROR);
+        showStatusMessage(error.message || 'Failed to add pattern to playlist', 'error');
+    }
+}
+
+// Show create playlist form
+function showCreatePlaylistForm() {
+    document.getElementById('createNewPlaylistBtn').classList.add('hidden');
+    document.getElementById('createPlaylistForm').classList.remove('hidden');
+    
+    // Focus the input
+    setTimeout(() => {
+        const input = document.getElementById('newPlaylistNameInput');
+        input.focus();
+    }, 100);
+}
+
+// Hide create playlist form
+function hideCreatePlaylistForm() {
+    document.getElementById('createPlaylistForm').classList.add('hidden');
+    document.getElementById('createNewPlaylistBtn').classList.remove('hidden');
+    document.getElementById('newPlaylistNameInput').value = '';
+}
+
+// Create new playlist and add pattern
+async function createPlaylistAndAddPattern() {
+    const input = document.getElementById('newPlaylistNameInput');
+    const playlistName = input.value.trim();
+    
+    if (!playlistName) {
+        showStatusMessage('Please enter a playlist name', 'warning');
+        return;
+    }
+    
+    if (!currentPatternForPlaylist) {
+        showStatusMessage('No pattern selected', 'error');
+        return;
+    }
+    
+    try {
+        // Create the playlist with the pattern
+        const response = await fetch('/create_playlist', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                playlist_name: playlistName,
+                files: [currentPatternForPlaylist]
+            })
+        });
+        
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.detail || 'Failed to create playlist');
+        }
+        
+        const patternName = currentPatternForPlaylist.replace('.thr', '').split('/').pop();
+        showStatusMessage(`Created "${playlistName}" and added "${patternName}"`, 'success');
+        
+        // Hide the create form
+        hideCreatePlaylistForm();
+        
+        // Reload playlists to show the new one
+        await loadPlaylistsForPattern(currentPatternForPlaylist);
+        
+    } catch (error) {
+        logMessage(`Error creating playlist: ${error.message}`, LOG_TYPE.ERROR);
+        showStatusMessage(error.message || 'Failed to create playlist', 'error');
+    }
 } 

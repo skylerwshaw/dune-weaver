@@ -148,6 +148,9 @@
 .dark .hover\:bg-red-50:hover {
   background-color: #2d1a1a;
 }
+.dark .hover\:bg-blue-50:hover {
+  background-color: #1a2d3d;
+}
 .dark .focus\:ring-offset-2 {
   --tw-ring-offset-color: #262626;
 }
@@ -345,6 +348,11 @@
                     <span class="material-icons text-lg">play_arrow</span>
                     Play
                 </button>
+                <button id="addToPlaylistBtn"
+                        class="flex w-full items-center justify-center gap-2 rounded-lg border border-[#0b80ee] px-4 py-2.5 text-sm font-semibold text-[#0b80ee] shadow-sm transition-colors hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-[#0b80ee] focus:ring-offset-2">
+                    <span class="material-icons text-lg">playlist_add</span>
+                    Add to Playlist
+                </button>
                 <button id="deletePattern"
                         class="flex w-full items-center justify-center gap-2 rounded-lg border border-red-500 px-4 py-2.5 text-sm font-semibold text-red-500 shadow-sm transition-colors hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
                     <span class="material-icons text-lg">delete</span>
@@ -416,6 +424,62 @@
                         <span class="material-icons">replay</span>
                         Reset
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add to Playlist Modal -->
+<div id="addToPlaylistModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 shrink-0">
+                <h3 id="addToPlaylistModalTitle" class="text-xl font-semibold text-gray-900 dark:text-gray-100">Add to Playlist</h3>
+                <button id="closeAddToPlaylistModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <span class="material-icons text-2xl">close</span>
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-6 overflow-y-auto grow">
+                <!-- Create New Playlist Button -->
+                <button id="createNewPlaylistBtn" class="w-full mb-4 flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:border-[#0b80ee] hover:text-[#0b80ee] dark:hover:text-[#0b80ee] transition-colors">
+                    <span class="material-icons text-lg">add</span>
+                    Create New Playlist
+                </button>
+
+                <!-- Create Playlist Form (hidden by default) -->
+                <div id="createPlaylistForm" class="hidden mb-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Playlist Name</label>
+                    <input type="text" id="newPlaylistNameInput" 
+                           class="form-input block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 bg-white py-2 px-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:text-sm mb-3"
+                           placeholder="Enter playlist name...">
+                    <div class="flex gap-2">
+                        <button id="confirmCreatePlaylistBtn" class="flex-1 px-4 py-2 bg-[#0b80ee] text-white rounded-lg hover:bg-opacity-90 text-sm font-semibold">
+                            Create
+                        </button>
+                        <button id="cancelCreatePlaylistBtn" class="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-semibold">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Playlists Grid -->
+                <div id="playlistsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- Playlists will be dynamically loaded here -->
+                </div>
+
+                <!-- Empty State -->
+                <div id="noPlaylistsMessage" class="hidden text-center py-8 text-gray-500 dark:text-gray-400">
+                    <span class="material-icons text-4xl mb-2">queue_music</span>
+                    <p class="text-sm">No playlists yet. Create one to get started!</p>
+                </div>
+
+                <!-- Loading State -->
+                <div id="playlistsLoading" class="hidden text-center py-8">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100"></div>
                 </div>
             </div>
         </div>
