@@ -143,30 +143,30 @@ async def lifespan(app: FastAPI):
         if state.led_provider and state.wled_ip:
             state.save()
         
-        # Restore LED state on startup (priority order: idle effect > persisted state > off)
-        if state.led_controller:
+        # Restore LED state on startup if persistence is enabled
+        if state.led_controller and state.led_persist_enabled:
             try:
-                # Priority 1: Apply idle effect if configured (user's explicit preference)
+                # Prefer idle effect over persisted state when restoring
                 if state.dw_led_idle_effect:
-                    logger.info("Applying idle effect on startup")
+                    logger.info("Persistence enabled: applying idle effect on startup")
                     if state.led_provider == "dw_leds":
                         from modules.led.dw_led_controller import effect_idle as dw_effect_idle
                         dw_effect_idle(state.led_controller.get_controller(), state.dw_led_idle_effect)
                     elif state.led_provider == "wled":
                         state.led_controller.effect_idle()
-                # Priority 2: Restore persisted state if persistence enabled
-                elif state.led_persist_enabled and state.led_persisted_state:
-                    logger.info("Restoring persisted LED state on startup")
+                elif state.led_persisted_state:
+                    logger.info("Persistence enabled: restoring persisted LED state on startup")
                     restored = state.led_controller.restore_state(state.led_persisted_state)
                     if restored:
                         logger.info("LED state restored successfully")
                     else:
                         logger.warning("Failed to restore LED state, LEDs will remain off")
-                # Priority 3: Default - LEDs stay off
                 else:
-                    logger.info("No idle effect or persisted state, LEDs will remain off")
+                    logger.info("Persistence enabled but no state to restore, LEDs will remain off")
             except Exception as e:
                 logger.warning(f"Failed to restore LED state on startup: {e}")
+        elif state.led_controller:
+            logger.info("LED persistence disabled, LEDs will remain off on startup")
     except Exception as e:
         logger.warning(f"Failed to initialize LED controller: {str(e)}")
         state.led_controller = None
