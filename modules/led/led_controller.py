@@ -210,6 +210,67 @@ class LEDController:
         logger.debug(response)
         return response
 
+    def capture_state(self) -> Optional[Dict]:
+        """
+        Capture current WLED state for persistence
+        
+        Returns:
+            Dict with current state or None if not connected
+        """
+        try:
+            url = self._get_base_url()
+            response = requests.get(f"{url}/state", timeout=2)
+            response.raise_for_status()
+            wled_state = response.json()
+            
+            # Capture relevant state
+            return {
+                "provider": "wled",
+                "power_on": wled_state.get('on', False),
+                "brightness": wled_state.get('bri', 128),
+                "preset_id": wled_state.get('ps', -1),
+                "playlist_id": wled_state.get('pl', -1),
+                # Capture first segment info if available
+                "seg": wled_state.get('seg', [{}])[0] if wled_state.get('seg') else {}
+            }
+        except Exception as e:
+            logger.error(f"Failed to capture WLED state: {e}")
+            return None
+
+    def restore_state(self, state_dict: Dict) -> bool:
+        """
+        Restore WLED state from persisted state
+        
+        Args:
+            state_dict: State dict from capture_state()
+            
+        Returns:
+            True if restored successfully
+        """
+        if not state_dict or state_dict.get("provider") != "wled":
+            return False
+        
+        try:
+            # Restore brightness first
+            brightness = state_dict.get("brightness", 128)
+            self.set_brightness(brightness)
+            
+            # Restore preset if one was set
+            preset_id = state_dict.get("preset_id", -1)
+            if preset_id > 0:
+                self.set_preset(preset_id)
+            
+            # Restore power state last
+            power_on = state_dict.get("power_on", False)
+            self.set_power(1 if power_on else 0)
+            
+            logger.info(f"WLED state restored: power={power_on}, brightness={brightness}, preset={preset_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to restore WLED state: {e}")
+            return False
+
 def effect_loading(led_controller: LEDController):
     res = led_controller.set_effect(47, hex='#ffa000', hex2='#000000', palette=0, speed=150, intensity=150)
     if res.get('is_on', False):

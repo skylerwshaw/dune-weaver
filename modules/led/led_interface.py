@@ -149,6 +149,39 @@ class LEDInterface:
         """Get the underlying controller instance (for advanced usage)"""
         return self._controller
 
+    def capture_state(self) -> Optional[dict]:
+        """
+        Capture current LED state for persistence
+        
+        Returns:
+            Dict with current state or None if not configured/available
+        """
+        if not self.is_configured:
+            return None
+        
+        if hasattr(self._controller, 'capture_state'):
+            return self._controller.capture_state()
+        
+        return None
+
+    def restore_state(self, state_dict: dict) -> bool:
+        """
+        Restore LED state from persisted state
+        
+        Args:
+            state_dict: State dict from capture_state()
+            
+        Returns:
+            True if restored successfully
+        """
+        if not self.is_configured or not state_dict:
+            return False
+        
+        if hasattr(self._controller, 'restore_state'):
+            return self._controller.restore_state(state_dict)
+        
+        return False
+
     # Async versions of methods for non-blocking calls from async context
     # These use asyncio.to_thread() to avoid blocking the event loop
 

@@ -519,6 +519,87 @@ class DWLEDController:
 
         return status
 
+    def capture_state(self) -> Optional[Dict]:
+        """
+        Capture current LED state for persistence
+        
+        Returns:
+            Dict with current state or None if not initialized
+        """
+        if not self._initialized:
+            return None
+        
+        # Convert RGB tuples to hex strings
+        def rgb_to_hex(rgb_tuple):
+            return f"#{rgb_tuple[0]:02x}{rgb_tuple[1]:02x}{rgb_tuple[2]:02x}"
+        
+        return {
+            "provider": "dw_leds",
+            "power_on": self._powered_on,
+            "effect_id": self._current_effect_id,
+            "palette_id": self._current_palette_id,
+            "speed": self._speed,
+            "intensity": self._intensity,
+            "brightness": int(self.brightness * 100),
+            "color1": rgb_to_hex(self._color1),
+            "color2": rgb_to_hex(self._color2),
+            "color3": rgb_to_hex(self._color3)
+        }
+
+    def restore_state(self, state_dict: Dict) -> bool:
+        """
+        Restore LED state from persisted state
+        
+        Args:
+            state_dict: State dict from capture_state()
+            
+        Returns:
+            True if restored successfully
+        """
+        if not state_dict or state_dict.get("provider") != "dw_leds":
+            return False
+        
+        try:
+            # Restore colors first
+            color1 = state_dict.get("color1", "#ff0000")
+            color2 = state_dict.get("color2", "#000000")
+            color3 = state_dict.get("color3", "#0000ff")
+            
+            # Convert hex to RGB
+            def hex_to_rgb(hex_str):
+                hex_str = hex_str.lstrip('#')
+                return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
+            
+            self.set_colors(
+                color1=hex_to_rgb(color1),
+                color2=hex_to_rgb(color2),
+                color3=hex_to_rgb(color3)
+            )
+            
+            # Restore brightness
+            brightness = state_dict.get("brightness", 35)
+            self.set_brightness(brightness)
+            
+            # Restore effect and palette
+            effect_id = state_dict.get("effect_id", 0)
+            palette_id = state_dict.get("palette_id", 0)
+            speed = state_dict.get("speed", 128)
+            intensity = state_dict.get("intensity", 128)
+            
+            self.set_effect(effect_id, speed=speed, intensity=intensity)
+            self.set_palette(palette_id)
+            
+            # Restore power state last
+            power_on = state_dict.get("power_on", False)
+            self.set_power(1 if power_on else 0)
+            
+            logger.info(f"DW LEDs state restored: power={power_on}, effect={effect_id}, palette={palette_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to restore DW LEDs state: {e}")
+            return False
+
     def stop(self):
         """Stop the effect loop and cleanup"""
         self._stop_thread.set()
