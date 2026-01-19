@@ -142,6 +142,31 @@ async def lifespan(app: FastAPI):
         # Save if provider was auto-detected
         if state.led_provider and state.wled_ip:
             state.save()
+        
+        # Restore LED state on startup (priority order: idle effect > persisted state > off)
+        if state.led_controller:
+            try:
+                # Priority 1: Apply idle effect if configured (user's explicit preference)
+                if state.dw_led_idle_effect:
+                    logger.info("Applying idle effect on startup")
+                    if state.led_provider == "dw_leds":
+                        from modules.led.dw_led_controller import effect_idle as dw_effect_idle
+                        dw_effect_idle(state.led_controller.get_controller(), state.dw_led_idle_effect)
+                    elif state.led_provider == "wled":
+                        state.led_controller.effect_idle()
+                # Priority 2: Restore persisted state if persistence enabled
+                elif state.led_persist_enabled and state.led_persisted_state:
+                    logger.info("Restoring persisted LED state on startup")
+                    restored = state.led_controller.restore_state(state.led_persisted_state)
+                    if restored:
+                        logger.info("LED state restored successfully")
+                    else:
+                        logger.warning("Failed to restore LED state, LEDs will remain off")
+                # Priority 3: Default - LEDs stay off
+                else:
+                    logger.info("No idle effect or persisted state, LEDs will remain off")
+            except Exception as e:
+                logger.warning(f"Failed to restore LED state on startup: {e}")
     except Exception as e:
         logger.warning(f"Failed to initialize LED controller: {str(e)}")
         state.led_controller = None
@@ -240,6 +265,17 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down Dune Weaver application...")
+    
+    # Capture LED state before shutdown if persistence enabled
+    if state.led_persist_enabled and state.led_controller:
+        try:
+            captured = state.led_controller.capture_state()
+            if captured:
+                state.led_persisted_state = captured
+                state.save()
+                logger.info(f"Captured LED state before shutdown: {captured.get('provider')}")
+        except Exception as e:
+            logger.warning(f"Failed to capture LED state on shutdown: {e}")
 
     # Shutdown process pool
     pool_module.shutdown_pool(wait=True)
@@ -2733,6 +2769,38 @@ async def dw_leds_get_idle_timeout():
         "remaining_minutes": remaining_minutes
     }
 
+@app.get("/api/led/persist_state")
+async def get_led_persist_state():
+    """Get LED persistence configuration"""
+    return {
+        "enabled": state.led_persist_enabled,
+        "persisted_state": state.led_persisted_state
+    }
+
+@app.post("/api/led/persist_state")
+async def set_led_persist_state(request: dict):
+    """Enable/disable LED state persistence"""
+    enabled = request.get("enabled", False)
+    state.led_persist_enabled = enabled
+    
+    # If enabling, capture current state immediately
+    if enabled and state.led_controller:
+        captured = state.led_controller.capture_state()
+        if captured:
+            state.led_persisted_state = captured
+            logger.info(f"LED persistence enabled, captured state: {captured.get('provider')}")
+    # If disabling, clear persisted state
+    elif not enabled:
+        state.led_persisted_state = None
+        logger.info("LED persistence disabled")
+    
+    state.save()
+    return {
+        "success": True,
+        "enabled": enabled,
+        "persisted_state": state.led_persisted_state
+    }
+
 @app.get("/table_control")
 async def table_control(request: Request):
     return templates.TemplateResponse("table_control.html", {"request": request, "app_name": state.app_name, "custom_logo": state.custom_logo})
@@ -2758,6 +2826,16 @@ def signal_handler(signum, frame):
     """Handle shutdown signals gracefully."""
     logger.info("Received shutdown signal, cleaning up...")
     try:
+        # Capture LED state before shutdown if persistence enabled
+        if state.led_persist_enabled and state.led_controller:
+            try:
+                captured = state.led_controller.capture_state()
+                if captured:
+                    state.led_persisted_state = captured
+                    logger.info(f"Captured LED state before shutdown: {captured.get('provider')}")
+            except Exception as e:
+                logger.warning(f"Failed to capture LED state on shutdown: {e}")
+        
         # Turn off all LEDs on shutdown
         if state.led_controller:
             state.led_controller.set_power(0)
