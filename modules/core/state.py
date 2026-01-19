@@ -82,6 +82,11 @@ class AppState:
         self.dw_led_idle_timeout_enabled = False  # Enable automatic LED turn off after idle period
         self.dw_led_idle_timeout_minutes = 30  # Idle timeout duration in minutes
         self.dw_led_last_activity_time = None  # Last activity timestamp (runtime only, not persisted)
+        
+        # LED state persistence settings
+        self.led_persist_enabled = False  # Enable LED state persistence across power cycles
+        self.led_persisted_state = None  # Captured LED state: {provider, power_on, effect_id, palette_id, speed, intensity, brightness, colors}
+        
         self.skip_requested = False
         self.table_type = None
         self.table_type_override = None  # User override for table type detection
@@ -264,6 +269,8 @@ class AppState:
             "dw_led_playing_effect": self.dw_led_playing_effect,
             "dw_led_idle_timeout_enabled": self.dw_led_idle_timeout_enabled,
             "dw_led_idle_timeout_minutes": self.dw_led_idle_timeout_minutes,
+            "led_persist_enabled": self.led_persist_enabled,
+            "led_persisted_state": self.led_persisted_state,
             "app_name": self.app_name,
             "custom_logo": self.custom_logo,
             "auto_play_enabled": self.auto_play_enabled,
@@ -348,6 +355,10 @@ class AppState:
         # Load idle timeout settings
         self.dw_led_idle_timeout_enabled = data.get('dw_led_idle_timeout_enabled', False)
         self.dw_led_idle_timeout_minutes = data.get('dw_led_idle_timeout_minutes', 30)
+
+        # Load LED persistence settings
+        self.led_persist_enabled = data.get('led_persist_enabled', False)
+        self.led_persisted_state = data.get('led_persisted_state', None)
 
         self.app_name = data.get("app_name", "Dune Weaver")
         self.custom_logo = data.get("custom_logo", None)
