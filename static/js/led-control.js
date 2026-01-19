@@ -830,22 +830,26 @@ function initializeColoris() {
 
 // Initialize LED persistence toggle
 async function initializePersistenceToggle() {
-    const persistToggle = document.getElementById('led-persist-toggle');
-    if (!persistToggle) return;
+    const persistToggleWled = document.getElementById('led-persist-toggle-wled');
+    const persistToggleDw = document.getElementById('led-persist-toggle-dw');
+    
+    if (!persistToggleWled && !persistToggleDw) return;
 
     try {
         // Load current persistence state
         const response = await fetch('/api/led/persist_state');
         if (response.ok) {
             const data = await response.json();
-            persistToggle.checked = data.enabled;
+            // Update both checkboxes to keep them in sync
+            if (persistToggleWled) persistToggleWled.checked = data.enabled;
+            if (persistToggleDw) persistToggleDw.checked = data.enabled;
         }
     } catch (error) {
         console.error('Failed to load persistence state:', error);
     }
 
-    // Handle toggle changes
-    persistToggle.addEventListener('change', async (e) => {
+    // Handle toggle changes for both checkboxes
+    const handleToggleChange = async (e) => {
         const enabled = e.target.checked;
         
         try {
@@ -859,6 +863,10 @@ async function initializePersistenceToggle() {
             const data = await response.json();
 
             if (data.success) {
+                // Keep both checkboxes in sync
+                if (persistToggleWled) persistToggleWled.checked = enabled;
+                if (persistToggleDw) persistToggleDw.checked = enabled;
+                
                 const message = enabled 
                     ? 'LED persistence enabled - state will be restored on reboot'
                     : 'LED persistence disabled';
@@ -875,14 +883,23 @@ async function initializePersistenceToggle() {
             }
         } catch (error) {
             console.error('Failed to update persistence state:', error);
-            // Revert toggle on error
-            persistToggle.checked = !enabled;
+            // Revert both toggles on error
+            if (persistToggleWled) persistToggleWled.checked = !enabled;
+            if (persistToggleDw) persistToggleDw.checked = !enabled;
             
             if (document.getElementById('dw-leds-container')?.classList.contains('hidden') === false) {
                 showStatus(`Failed to update persistence: ${error.message}`, 'error');
             }
         }
-    });
+    };
+
+    // Attach event listeners to both checkboxes
+    if (persistToggleWled) {
+        persistToggleWled.addEventListener('change', handleToggleChange);
+    }
+    if (persistToggleDw) {
+        persistToggleDw.addEventListener('change', handleToggleChange);
+    }
 }
 
 // Initialize on page load
