@@ -57,10 +57,14 @@ async function initializeLedPage() {
             if (wledFrame) {
                 wledFrame.src = `http://${ledConfig.wled_ip}`;
             }
+            // Initialize persistence toggle for WLED
+            await initializePersistenceToggle();
         } else if (ledConfig.provider === 'dw_leds') {
             // Show DW LEDs controls
             dwLedsContainer.classList.remove('hidden');
             await initializeDWLedsControls();
+            // Initialize persistence toggle for DW LEDs (after DW LEDs controls init)
+            await initializePersistenceToggle();
         } else {
             // Show not configured message
             notConfigured.classList.remove('hidden');
@@ -821,6 +825,63 @@ function initializeColoris() {
         picker.setAttribute('data-coloris', '');
         // Set initial background color and text color
         updateColorPickerStyle(picker, picker.value);
+    });
+}
+
+// Initialize LED persistence toggle
+async function initializePersistenceToggle() {
+    const persistToggle = document.getElementById('led-persist-toggle');
+    if (!persistToggle) return;
+
+    try {
+        // Load current persistence state
+        const response = await fetch('/api/led/persist_state');
+        if (response.ok) {
+            const data = await response.json();
+            persistToggle.checked = data.enabled;
+        }
+    } catch (error) {
+        console.error('Failed to load persistence state:', error);
+    }
+
+    // Handle toggle changes
+    persistToggle.addEventListener('change', async (e) => {
+        const enabled = e.target.checked;
+        
+        try {
+            const response = await fetch('/api/led/persist_state', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled })
+            });
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+
+            if (data.success) {
+                const message = enabled 
+                    ? 'LED persistence enabled - state will be restored on reboot'
+                    : 'LED persistence disabled';
+                
+                // Show status message if in DW LEDs mode
+                if (document.getElementById('dw-leds-container')?.classList.contains('hidden') === false) {
+                    showStatus(message, 'success');
+                } else {
+                    // For WLED, just log it
+                    console.log(message);
+                }
+            } else {
+                throw new Error('Failed to update persistence setting');
+            }
+        } catch (error) {
+            console.error('Failed to update persistence state:', error);
+            // Revert toggle on error
+            persistToggle.checked = !enabled;
+            
+            if (document.getElementById('dw-leds-container')?.classList.contains('hidden') === false) {
+                showStatus(`Failed to update persistence: ${error.message}`, 'error');
+            }
+        }
     });
 }
 
